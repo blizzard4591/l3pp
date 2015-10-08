@@ -1,27 +1,12 @@
 /**
+ * L3++: Lightweight Logging Library for C++
+ *
  * @file l3pp.h
  * @author Gereon Kremer <gereon.kremer@cs.rwth-aachen.de>
  *
- * @mainpage
- * L3++: Lightweight Logging Library for C++
- *
- * L3++ is a self-contained, single-header, cross-platform logging library for C++.
- * The main goals for this library are simplicity, modularity and ease of use.
- *
- * Copyright (C) 2015 Gereon Kremer
- *
  * This library is released under the MIT License.
  *
- *
- * L3++ is based on the following conceptual components:
- * 
- * <ul>
- * <li>RecordInfo: A record info stores auxiliary information of a log message like the filename, line number and function name where the log message was emitted.
- * <li>Channel: A channel categorizes log messages, usually according to logical components or modules in the source code.</li>
- * <li>Sink: A sink represents a logging output, for example the terminal or a log file.</li>
- * <li>Filter: A filter is associated with a sink and decides which messages are forwarded to the sink.</li>
- * <li>Formatter: A formatter is associated with a sink and converts a log message into an actual string.</li>
- * </ul>
+ * Copyright (C) 2015 Gereon Kremer
  */
 
 #pragma once
@@ -44,23 +29,6 @@
 #endif
 
 /**
- * 
- * 
- * This implementation provides a FileSink and a StreamSink, but the basic Sink class can be extended as necessary.
- * A Channel is a string that identifies the context of the log message, usually something like the class name where the log message is emitted.
- * 
- * 
- * A Filter is associated with a Sink and makes sure that only a subset of all log messages is forwarded to the Sink.
- * Filter rules are pairs of a Channel and a minimum LogLevel, meaning that messages of this Channel and at least the given LogLevel are forwarded.
- * If a Filter does not contain any rule for some Channel, the parent Channel is considered. Each Filter contains a rule for the empty Channel, initialized with LVL_DEFAULT.
- * 
- * A Formatter is associated with a Sink and produces the actual string that is sent to the Sink.
- * Usually, it adds auxiliary information like the current time, LogLevel, Channel and information from a RecordInfo to the string logged by the user.
- * The Formatter implements a reasonable default behaviour for log files, but it can be subclassed and modified as necessary.
- * 
- * The Logger class finally plugs all these components together.
- * It allows to configure multiple Sink objects which are identified by strings called `id` and offers a central `log()` method.
- * 
  * Initial configuration may look like this:
  * @code{.cpp}
  * l3pp::logger().configure("logfile", "carl.log");
@@ -185,9 +153,7 @@ inline std::ostream& operator<<(std::ostream& os, LogLevel level) {
  * Base class for a logging sink. It only provides an interface to access some std::ostream.
  */
 struct Sink {
-	/**
-	 * Default destructor.
-     */
+	/// Virtual destructor.
 	virtual ~Sink() {}
 	/**
 	 * Abstract logging interface.
@@ -352,7 +318,7 @@ struct Formatter {
  */
 class Logger {
 private:
-	/// Mapping from channels to associated logging classes.
+	/// Mapping from sink identifiers to associated logging classes.
 	std::map<std::string, std::tuple<std::shared_ptr<Sink>, Filter, std::shared_ptr<Formatter>>> data;
 	/// Logging mutex to ensure thread-safe logging.
 	std::mutex mutex;
