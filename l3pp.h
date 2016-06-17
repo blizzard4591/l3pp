@@ -70,7 +70,7 @@ enum class LogLevel {
 	/// Log messages used to warn about an undesired state.
 	WARN,
 	/// Log messages used for errors that can be handled.
-	ERROR,
+	ERR,
 	/// Log messages used for errors that lead to program termination.
 	FATAL,
 	/// Log no messages.
@@ -160,6 +160,6 @@ struct EntryContext {
 /// Log with level WARN.
 #define L3PP_LOG_WARN(channel, expr) __L3PP_LOG(::l3pp::LogLevel::WARN, channel, expr)
 /// Log with level ERROR.
-#define L3PP_LOG_ERROR(channel, expr) __L3PP_LOG(::l3pp::LogLevel::ERROR, channel, expr)
+#define L3PP_LOG_ERROR(channel, expr) __L3PP_LOG(::l3pp::LogLevel::ERR, channel, expr)
 /// Log with level FATAL.
 #define L3PP_LOG_FATAL(channel, expr) __L3PP_LOG(::l3pp::LogLevel::FATAL, channel, expr)

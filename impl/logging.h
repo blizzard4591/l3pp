@@ -22,7 +22,7 @@ inline std::ostream& operator<<(std::ostream& os, LogLevel level) {
 		case LogLevel::DEBUG:   return os << "DEBUG";
 		case LogLevel::INFO:    return os << "INFO";
 		case LogLevel::WARN:    return os << "WARN";
-		case LogLevel::ERROR:   return os << "ERROR";
+		case LogLevel::ERR:     return os << "ERROR";
 		case LogLevel::FATAL:   return os << "FATAL";
 		case LogLevel::OFF:     return os << "OFF";
 		default:                return os << "???";

@@ -139,7 +139,7 @@ public:
 		log(LogLevel::WARN, msg, context);
 	}
 	void error(std::string const& msg, EntryContext context = EntryContext()) {
-		log(LogLevel::ERROR, msg, context);
+		log(LogLevel::ERR, msg, context);
 	}
 	void fatal(std::string const& msg, EntryContext context = EntryContext()) {
 		log(LogLevel::FATAL, msg, context);
@@ -160,7 +160,7 @@ public:
 		return log(LogLevel::WARN, context);
 	}
 	LogStream error(EntryContext context = EntryContext()) {
-		return log(LogLevel::ERROR, context);
+		return log(LogLevel::ERR, context);
 	}
 	LogStream fatal(EntryContext context = EntryContext()) {
 		return log(LogLevel::FATAL, context);
