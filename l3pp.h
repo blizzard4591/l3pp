@@ -145,9 +145,9 @@ struct EntryContext {
 #define __L3PP_LOG_RECORD l3pp::EntryContext(__FILE__, __LINE__, __func__)
 /// Basic logging macro.
 #define __L3PP_LOG(level, channel, expr) { \
-        ::l3pp::LogPtr carl_channel = ::log4carl::Logger::getLogger(channel); \
-    if (carl_channel->getLevel() <= level) { \
-        ::l3pp::Logger::getLogger(channel)->log(level) << __L3PP_LOG_RECORD << expr; \
+    auto L3PP_channel = ::log4carl::Logger::getLogger(channel); \
+    if (L3PP_channel->getLevel() <= level) { \
+        L3PP_channel->log(level, __L3PP_LOG_RECORD) << expr; \
     } \
 }
 

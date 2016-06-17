@@ -25,12 +25,11 @@ class LogStream {
 
 	Logger& logger;
 	LogLevel level;
-	mutable EntryContext context;
+	EntryContext context;
 	mutable std::ostringstream stream;
-	mutable bool has_context;
 
-	LogStream(Logger& logger, LogLevel level) :
-		logger(logger), level(level), has_context(false)
+	LogStream(Logger& logger, LogLevel level, EntryContext context) :
+		logger(logger), level(level), context(context)
 	{
 	}
 
@@ -39,12 +38,10 @@ class LogStream {
 public:
 	LogStream(LogStream&& other) :
 		logger(other.logger), level(other.level), context(std::move(other.context)),
-		stream(std::move(other.stream)), has_context(other.has_context)
+		stream(std::move(other.stream))
 	{
 	}
 	~LogStream();
-
-	friend LogStream const& operator<<(LogStream const& stream, EntryContext context);
 
 	template<typename T>
 	friend LogStream const& operator<<(LogStream const& stream, T const& val);
@@ -126,47 +123,46 @@ public:
 		this->additive = additive;
 	}
 
-	void log(LogLevel level, std::string const& msg);
-	void log(LogLevel level, std::string const& msg, EntryContext context);
+	void log(LogLevel level, std::string const& msg, EntryContext context = EntryContext());
 
-	void trace(std::string const& msg) {
-		log(LogLevel::TRACE, msg);
+	void trace(std::string const& msg, EntryContext context = EntryContext()) {
+		log(LogLevel::TRACE, msg, context);
 	}
-	void debug(std::string const& msg) {
-		log(LogLevel::DEBUG, msg);
+	void debug(std::string const& msg, EntryContext context = EntryContext()) {
+		log(LogLevel::DEBUG, msg, context);
 	}
-	void info(std::string const& msg) {
-		log(LogLevel::INFO, msg);
+	void info(std::string const& msg, EntryContext context = EntryContext()) {
+		log(LogLevel::INFO, msg, context);
 	}
-	void warn(std::string const& msg) {
-		log(LogLevel::WARN, msg);
+	void warn(std::string const& msg, EntryContext context = EntryContext()) {
+		log(LogLevel::WARN, msg, context);
 	}
-	void error(std::string const& msg) {
-		log(LogLevel::ERROR, msg);
+	void error(std::string const& msg, EntryContext context = EntryContext()) {
+		log(LogLevel::ERROR, msg, context);
 	}
-	void fatal(std::string const& msg) {
-		log(LogLevel::FATAL, msg);
+	void fatal(std::string const& msg, EntryContext context = EntryContext()) {
+		log(LogLevel::FATAL, msg, context);
 	}
 
-	LogStream log(LogLevel level);
+	LogStream log(LogLevel level, EntryContext context = EntryContext());
 
-	LogStream trace() {
-		return log(LogLevel::TRACE);
+	LogStream trace(EntryContext context = EntryContext()) {
+		return log(LogLevel::TRACE, context);
 	}
-	LogStream debug() {
-		return log(LogLevel::DEBUG);
+	LogStream debug(EntryContext context = EntryContext()) {
+		return log(LogLevel::DEBUG, context);
 	}
-	LogStream info() {
-		return log(LogLevel::INFO);
+	LogStream info(EntryContext context = EntryContext()) {
+		return log(LogLevel::INFO, context);
 	}
-	LogStream warn() {
-		return log(LogLevel::WARN);
+	LogStream warn(EntryContext context = EntryContext()) {
+		return log(LogLevel::WARN, context);
 	}
-	LogStream error() {
-		return log(LogLevel::ERROR);
+	LogStream error(EntryContext context = EntryContext()) {
+		return log(LogLevel::ERROR, context);
 	}
-	LogStream fatal() {
-		return log(LogLevel::FATAL);
+	LogStream fatal(EntryContext context = EntryContext()) {
+		return log(LogLevel::FATAL, context);
 	}
 
 	static void initialize();

@@ -29,11 +29,7 @@ namespace detail {
 
 inline LogStream::~LogStream() {
 	if (level != LogLevel::OFF) {
-		if (has_context) {
-			logger.log(level, stream.str(), context);
-		} else {
-			logger.log(level, stream.str());
-		}
+		logger.log(level, stream.str(), context);
 	}
 }
 
@@ -53,11 +49,6 @@ inline void Logger::removeSink(SinkPtr sink) {
 	}
 }
 
-inline void Logger::log(LogLevel level, std::string const& msg) {
-	auto context = EntryContext();
-	log(level, msg, context);
-}
-
 inline void Logger::log(LogLevel level, std::string const& msg, EntryContext context) {
 	if (level < getLevel()) {
 		return;
@@ -68,12 +59,12 @@ inline void Logger::log(LogLevel level, std::string const& msg, EntryContext con
 	logEntry(context, msg);
 }
 
-inline LogStream Logger::log(LogLevel level) {
+inline LogStream Logger::log(LogLevel level, EntryContext context) {
 	if (level < getLevel()) {
 		// Effectively disables the stream
-		return LogStream(*this, LogLevel::OFF);
+		return LogStream(*this, LogLevel::OFF, context);
 	} else {
-		return LogStream(*this, level);
+		return LogStream(*this, level, context);
 	}
 }
 
@@ -129,12 +120,6 @@ inline LogStream const& operator<<(LogStream const& stream, std::ostream& (*F)(s
 	if (stream.level != LogLevel::OFF) {
 		stream.stream << F;
 	}
-	return stream;
-}
-
-inline LogStream const& operator<<(LogStream const& stream, EntryContext context) {
-	stream.context = context;
-	stream.has_context = true;
 	return stream;
 }
 
