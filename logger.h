@@ -37,9 +37,10 @@ class LogStream {
 	LogStream& operator=(const LogStream&) = delete;
 public:
 	LogStream(LogStream&& other) :
-		logger(other.logger), level(other.level), context(std::move(other.context)),
-		stream(std::move(other.stream))
+		logger(other.logger), level(other.level), context(std::move(other.context))/*,
+		stream(std::move(other.stream))*/
 	{
+		stream.str(other.stream.str());
 	}
 	~LogStream();
 
