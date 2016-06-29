@@ -15,69 +15,53 @@ Concepts
 L3++ is based on the following conceptual components:
 
 * RecordInfo: A record info stores auxiliary information of a log message like the filename, line number and function name where the log message was emitted.
-* Channel: A channel categorizes log messages, usually according to logical components or modules in the source code.
+* Logger: A logger categorizes log messages, usually according to logical components or modules in the source code.
 * Sink: A sink represents a logging output, for example the terminal or a log file.
-* Filter: A filter is associated with a sink and decides which messages are forwarded to the sink.
 * Formatter: A formatter is associated with a sink and converts a log message into an actual string.
 
 
 Log levels
 -----
-The following log levels exist:
-* LVL_ALL
-* LVL_TRACE
-* LVL_DEBUG
-* LVL_INFO
-* LVL_WARN
-* LVL_ERROR
-* LVL_FATAL
-* LVL_OFF
+The following log levels exist (from `l3pp::LogLevel`):
+* ALL
+* TRACE
+* DEBUG
+* INFO
+* WARN
+* ERR
+* FATAL
+* OFF
 
-Hierarchical Channels
+Hierarchical Loggers
 -----
-Channels are hierarchically structured strings like `"app.module.submodule"`.
-In this example, `submodule` is considered a subchannel of `module` and `app` the parent of `module`.
-A subchannel implicitly inherits all filter rules unless a filter rule is explicitly specified.
+Loggers are hierarchically structured strings like `"app.module.submodule"`. In this example, `submodule` is considered a sublogger of `module` and `app` the parent of `module`. A sublogger implicitly inherits all sinks and the log level of the parent, unless explicitly configured otherwise.
 
+The hierarchical tree of loggers always contains the root logger at the top. The root logger itself does not have a parent, nor a name. It can be accessed via `l3pp::Logging::getRootLogger()`.
 
-Filter rules
+Each logger is assigned a log level, or is configured to inherit the log level of the parent (with the special log level `l3pp::LogLevel::INHERIT`). Note that the root logger cannot inherit a log level. Any log entry with a lower level is filtered out and will not be logged.
+
+A logger can also be assigned one or more sinks. By default, a logger will log to both the sinks of its parent, as well as its own sinks. Should a logger only use it own sinks, it should be set to non-additive (using `Logger::setAdditive(false)`).
+
+Sinks
 -----
-A filter object is given the channel and the level of a log message.
-Based on these information, it decides whether a log message is actually sent to the respective sink.
+A sink provides an output for loggers. Loggers may define multiple sinks, and sinks may be shared between loggers. Sinks are associated with a formatter and a log level. The log level specifies the minimum level of a message for it to be output (independent of the log level of a logger), and by default permits all log messages. A formatter formats the log messages before being output. By default, a simple formatter is used which prints the log level, message and a newline, but other formatters can be specified.
 
-A filter consists of an arbitrary number rules that map a channel to a minimal log level.
-If the log level of a message is at least the one stored for this channel, it gets passed to the sink.
-If no rule exists for the respective channel, the filter looks for the parent channel.
-Every filter object defines a rule for the empty channel `""` as a safe fallback.
-
+Formatters
+-----
+A formatter shapes a log message before being sent to its final destination. A non-configurable simple formatter exists, as well as a template-based formatter. The latter specifies the format of a message by means of its template arguments, see `l3pp::makeTemplateFormatter`.
 
 
 Basic Usage
 =====
 
-The logger object itself can be accessed via `l3pp::logger()`.
-It provides two methods that are important for configuration:
-* `configure()`: Configures sinks.
-* `filter()`: Retrieves filter objects.
+A logger object can be accessed via `l3pp::Logger::getLogger()` or `l3pp::Logger::getRootLogger()`. By default, the root logger does not output anywhere. Therefore, a sink should be added. An initial configuration may look like this:
 
-`configure()` comes in different flavours, depending on the type of sink you want to create. The first argument is always a string that identifies this sink.
-* `std::string, std::shared_ptr<Sink>`: Creates an arbitrary sink.
-* `std::string, std::string`: Creates a FileSink using the second argument as file name.
-* `std::string, std::ostream`: Creates a StreamSink.
+    l3pp::Logger::initialize();
+    l3pp::SinkPtr sink = log4carl::StreamSink::create(std::clog);
+    l3pp::Logger::getRootLogger()->addSink(sink);
+    l3pp::Logger::getRootLogger()->setLevel(log4carl::LogLevel::INFO);
 
-`filter()` expects a sink identifier as single argument and returns a reference to the respective filter object.
-Note that the sink must be created beforehand by using `configure()`.
-
-An initial configuration may look like this:
-
-	l3pp::logger().configure("logfile", "demo.log");
-	l3pp::logger().filter("logfile")
-		("demo", l3pp::LogLevel::LVL_INFO)
-		("demo.core", l3pp::LogLevel::LVL_DEBUG)
-	;
-
-In this demo, a single sink `logfile` is created that passes log messages to the file `demo.log`.
-All messages in channel `demo` must have at least level `LVL_INFO` while messages in channel `demo.core` only need `LVL_DEBUG`.
+In this demo, a single sink is created that passes log messages to the standard logging stream `std::clog`. All messages must have at least level `LVL_INFO` before being printed.
 
 The actual logging is performed using a handful of macros.
 These macros
@@ -88,15 +72,12 @@ Considerations
 
 Performance
 -----
-
-While the use of hierarchical channels and multiple sinks with associated filters gives a lot of flexibility, it comes at a certain price.
-As the configuration is done at runtime (and may even change at runtime), the question whether a certain message is printed can only be answered at runtime.
-Therefore, every message, whether you will ever see it or not, has to pass through the logger and cost runtime.
+While the use of hierarchical loggers and multiple sinks with associated formatters gives a lot of flexibility, it comes at a certain price. As the configuration is done at runtime (and may even change at runtime), the question whether a certain message is printed can only be answered at runtime. Therefore, every message, whether you will ever see it or not, has to pass through the logger and cost runtime.
 
 To mitigate this, we suggest the following:
 
 Create a preprocessor flag (like `ENABLE_LOGGING`) and define your own set of logging macros.
-If this flag is defined, make your macros forward to the `__L3PP_LOG_*` macros.
+If this flag is defined, make your macros forward to the `L3PP_LOG_*` macros.
 If this flag is not defined, make your macros do nothing.
 
 
@@ -106,8 +87,7 @@ Assume you have an application that uses L3++ for logging as well as some other 
 L3++ will play nicely in this scenario (partly, it was designed for this case).
 
 However, you should take care of a few things:
-* Duplicate sinks: Sink identifiers like `stdout` or `logfile` may already be defined. Use `Logger::has()` to check for this.
-* Colliding channels: Prefix your channels with some unique prefix.
+* Colliding loggers: Prefix your loggers with some unique prefix.
 * Colliding macros: If you implement the aforementioned `ENABLE_LOGGING` macro, prefix your macros with your project name. Otherwise, these macros will collide.
 
 
@@ -116,9 +96,12 @@ Implementation Details
 
 Sinks
 -----
-A sink is a class that provides some `std::ostream`.
-Any class that inherits from `l3pp::Sink` can be used.
+A sink is a class that provides some `log` method. Any class that inherits from `l3pp::Sink` can be used.
 
 As of now, two implementations are available: 
 * FileSink: Writes to a output file.
 * StreamSink: Writes to any given `std::ostream`, for example to `std::cout`.
+
+Formatters
+-----
+A formatter is a functor that given a log entry, provides a formatted string. The base class `Formatter` provides some very simple formatting, whereas `TemplateFormatter` provides more control over the shape. Internally, a `TemplateFormatter` streams its arguments to a stream before constructing the string. The special types `FieldStr` and `TimeStr` can be used to format particular attributes of a log entry.
