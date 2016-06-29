@@ -1,131 +1,86 @@
 /**
- * L3++: Lightweight Logging Library for C++
- *
- * @file l3pp.h
+ * @file logging.h
  * @author Gereon Kremer <gereon.kremer@cs.rwth-aachen.de>
+ * @author Harold Bruintjes <h.bruintjes@cs.rwth-aachen.de>
  *
- * This library is released under the MIT License.
+ * The lightweight logging library for C++.
  *
- * Copyright (C) 2015 Gereon Kremer
- */
-
-#pragma once
-
-#include <cassert>
-#include <chrono>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <sstream>
-#include <thread>
-#include <utility>
-
-#ifdef L3PP_PROVIDE_STREAMINGOPS
-// This header provides streaming operators for most STL containers.
-#include "streamingOperators.h"
-#endif
-
-/**
+ * This logging facility is fairly generic and is used as a simple and
+ * header-only alternative to more advanced solutions like log4cplus or
+ * boost::log.
+ *
+ * The basic components are Sinks, Formatters and Loggers.
+ *
+ * A Sink represents a logging output like a terminal or a log file.
+ * This implementation provides a FileSink and a StreamSink, but the basic
+ * Sink class can be extended as necessary.
+ *
+ * A Formatter is associated with a Sink and produces the actual string that is
+ * sent to the Sink.
+ * Usually, it adds auxiliary information like the current time, LogLevel and
+ * source location to the string logged by the user.
+ * The Formatter implements a reasonable default behavior for simple logging,
+ * but it can be subclassed and modified as necessary.
+ *
+ * The Logger class finally plugs all these components together.
+ * Individual loggers can log to one or more sinks (inheritable) and are
+ * associated with an (inheritable) log level.
+ *
  * Initial configuration may look like this:
  * @code{.cpp}
- * l3pp::logger().configure("logfile", "carl.log");
- * l3pp::logger().filter("logfile")
- *     ("carl", l3pp::LogLevel::LVL_INFO)
- *     ("carl.core", l3pp::LogLevel::LVL_DEBUG)
- * ;
- * l3pp::logger().resetFormatter();
+ * l3pp::Logger::initialize();
+ * l3pp::SinkPtr sink = log4carl::StreamSink::create(std::clog);
+ * l3pp::Logger::getRootLogger()->addSink(sink);
+ * l3pp::Logger::getRootLogger()->setLevel(log4carl::LogLevel::INFO);
  * @endcode
  * 
  * Macro facilitate the usage:
  * <ul>
- * <li>`CARLLOG_<LVL>(channel, msg)` produces a normal log message where channel should be string identifying the channel and msg is the message to be logged.</li>
- * <li>`CARLLOG_FUNC(channel, args)` produces a log message tailored for function calls. args should represent the function arguments.</li>
- * <li>`CARLLOG_ASSERT(channel, condition, msg)` checks the condition and if it fails calls `CARLLOG_FATAL(channel, msg)` and asserts the condition.</li>
+ * <li>`L3PP_LOG_<LVL>(logger, msg)` produces a normal log message where
+ * logger should be string identifying the logger (or a LogPtr) and msg is the
+ * message to be logged.</li>
  * </ul>
- * Any message (`msg` or `args`) can be an arbitrary expression that one would stream to an `std::ostream` like `stream << (msg);`. No final newline is needed.
+ * Any message (`msg`) can be an arbitrary expression that one would
+ * stream to an `std::ostream` like `stream << (msg);`. The default formatter
+ * adds newlines.
+ * Manipulators are generally supported. However, for performance avoid std::endl
+ * and use '\n' directly.
  */
-/**
- * Main namespace.
- */
-namespace l3pp {
 
-/**
- * Utilities not directly related to logging.
- */
-namespace utility {
-	/**
-	 * Provides an easy way to obtain the current number of milliseconds that the program has been running.
-	 */
-	struct Timer {
-		/// The clock type used here.
-		typedef std::chrono::high_resolution_clock clock;
-		/// The duration type used here.
-		typedef std::chrono::duration<std::size_t,std::milli> duration;
-		/// Start of this timer.
-		clock::time_point start;
-		/// Default constructor. Starts the timer.
-		Timer(): start(clock::now()) {}
-		/**
-		 * Calculates the number of milliseconds since this object has been created.
-	     * @return Milliseconds passed.
-	     */
-		std::size_t passed() const {
-			clock::duration d(clock::now() - start);
-			return std::chrono::duration_cast<duration>(d).count();
-		}
-		/// Reset the start point to now.
-		void reset() {
-			start = clock::now();
-		}
-		/**
-		 * Streaming operator for a Timer.
-		 * Prints the result of `t.passed()`.
-		 * @param os Output stream.
-		 * @param t Timer.
-		 * @return os.
-		 */
-		friend std::ostream& operator<<(std::ostream& os, const Timer& t) {
-			return os << t.passed();
-		}
-	};
-	
-	/**
-	 * Returns the basename of a given filename.
-	 * @param s Filename.
-	 * @return Basename of s.
-	 */
-	inline std::string basename(const std::string& s) {
-		return s.substr(s.rfind('/') + 1);
-	}
-}
+#pragma once
+
+#include <chrono>
+#include <memory>
+
+namespace l3pp {
 
 /**
  * Indicated which log messages should be forwarded to some sink.
  * 
- * All messages which have a level that is equal or greater than the specified value will be forwarded.
+ * All messages which have a level that is equal or greater than the specified
+ * value will be forwarded.
  */
-enum class LogLevel : unsigned {
-	/// All log messages.
-	LVL_ALL,
+enum class LogLevel {
 	/// Log messages used for tracing the program flow in detail.
-	LVL_TRACE,
+	TRACE,
 	/// Log messages used for debugging.
-	LVL_DEBUG,
+	DEBUG,
 	/// Log messages used for information.
-	LVL_INFO,
+	INFO,
 	/// Log messages used to warn about an undesired state.
-	LVL_WARN,
+	WARN,
 	/// Log messages used for errors that can be handled.
-	LVL_ERROR,
+	ERROR,
 	/// Log messages used for errors that lead to program termination.
-	LVL_FATAL,
+	FATAL,
 	/// Log no messages.
-	LVL_OFF,
+	OFF,
+	/// Parent level
+	INHERIT,
 	/// Default log level.
-	LVL_DEFAULT = LVL_WARN
+	DEFAULT = WARN,
+	/// All log messages.
+	ALL = TRACE
 };
 
 /**
@@ -134,349 +89,77 @@ enum class LogLevel : unsigned {
  * @param level LogLevel.
  * @return os.
  */
-inline std::ostream& operator<<(std::ostream& os, LogLevel level) {
-	switch (level) {
-		case LogLevel::LVL_ALL:		return os << "ALL  ";
-		case LogLevel::LVL_TRACE:	return os << "TRACE";
-		case LogLevel::LVL_DEBUG:	return os << "DEBUG";
-		case LogLevel::LVL_INFO:	return os << "INFO ";
-		case LogLevel::LVL_WARN:	return os << "WARN ";
-		case LogLevel::LVL_ERROR:	return os << "ERROR";
-		case LogLevel::LVL_FATAL:	return os << "FATAL";
-		case LogLevel::LVL_OFF:		return os << "OFF  ";
-		default:					return os << "???  ";
+inline std::ostream& operator<<(std::ostream& os, LogLevel level);
+
+class Logger;
+
+/**
+ * Contextual information for a new log entry, contains such this as location,
+ * log info (level, logger) and the time of the event.
+ * A context will be created automatically by using the macros
+ */
+struct EntryContext {
+	// Program location
+	const char* filename;
+	size_t line;
+	const char* funcname;
+
+	// Time of entry
+	std::chrono::system_clock::time_point timestamp;
+
+	// Log event info
+	Logger const* logger;
+	LogLevel level;
+
+	EntryContext(const char* filename, size_t line, const char* funcname) :
+		filename(filename), line(line), funcname(funcname),
+		timestamp(std::chrono::system_clock::now()), logger(nullptr),
+		level(LogLevel::OFF)
+	{
 	}
+
+	EntryContext() :
+		filename(""), line(0), funcname(""),
+		timestamp(std::chrono::system_clock::now()), logger(nullptr),
+		level(LogLevel::OFF)
+	{
+	}
+};
+
 }
 
+#include "logger.h"
+#include "formatter.h"
+#include "sink.h"
 
-/**
- * Base class for a logging sink. It only provides an interface to access some std::ostream.
- */
-struct Sink {
-	/// Virtual destructor.
-	virtual ~Sink() {}
-	/**
-	 * Abstract logging interface.
-	 * The intended usage is to write any log output to the output stream returned by this function.
-     * @return Output stream.
-     */
-	virtual std::ostream& log() = 0;
-};
-/**
- * Logging sink that wraps an arbitrary `std::ostream`.
- * It is meant to be used for streams like `std::cout` or `std::cerr`.
- */
-struct StreamSink: public Sink {
-	/// Output stream.
-	std::ostream os;
-	/**
-	 * Create a StreamSink from some output stream.
-     * @param os Output stream.
-     */
-	StreamSink(std::ostream& _os): os(_os.rdbuf()) {}
-	virtual ~StreamSink() {}
-	virtual std::ostream& log() { return os; }
-};
-/**
- * Logging sink for file output.
- */
-struct FileSink: public Sink {
-	/// File output stream.
-	std::ofstream os;
-	/**
-	 * Create a FileSink that logs to the specified file.
-	 * The file is truncated upon construction.
-     * @param filename
-     */
-	FileSink(const std::string& filename): os(filename, std::ios::out) {}
-	virtual ~FileSink() { os.close(); }
-	virtual std::ostream& log() { return os; }
-};
+#include "impl/logging.h"
+#include "impl/logger.h"
+#include "impl/formatter.h"
+#include "impl/sink.h"
 
-/**
- * This class checks if some log message shall be forwarded to some sink.
- */
-struct Filter {
-	/// Mapping from channels to (minimal) log levels.
-	std::map<std::string, LogLevel> data;
-	
-	/**
-	 * Constructor.
-	 * @param level Default minimal log level.
-	 */
-	Filter(LogLevel level = LogLevel::LVL_DEFAULT) {
-		(*this)("", level);
-	}
-	/**
-	 * Set the minimum log level for some channel.
-	 * Returns `*this`, hence calls to this method can be chained arbitrarily.
-     * @param channel Channel name.
-     * @param level LogLevel.
-	 * @return This object.
-     */
-	Filter& operator()(const std::string& channel, LogLevel level) {
-		data[channel] = level;
-		return *this;
-	}
-	/**
-	 * Checks if the given log level is sufficient for the log message to be forwarded.
-     * @param channel Channel name.
-     * @param level LogLevel.
-     * @return If the message shall be forwarded.
-     */
-	bool check(const std::string& channel, LogLevel level) {
-		std::string curChan = channel;
-		auto it = data.find(curChan);
-		while (curChan.size() > 0 && it == data.end()) {
-			auto n = curChan.rfind('.');
-			curChan = (n == std::string::npos) ? "" : curChan.substr(0, n);
-			it = data.find(curChan);
-		}
-		assert(it != data.end());
-		return level >= it->second;
-	}
-	/**
-	 * Streaming operator for a Filter.
-	 * All the rules stored in the filter are printed in a human-readable fashion.
-	 * @param os Output stream.
-	 * @param f Filter.
-	 * @return os.
-	 */
-	friend std::ostream& operator<<(std::ostream& os, const Filter& f) {
-		os << "Filter:" << std::endl;
-		for (auto it: f.data) os << "\t\"" << it.first << "\" -> " << it.second << std::endl;
-		return os;
-	}
-};
-
-/**
- * Additional information about a log message.
- */
-struct RecordInfo {
-	/// File name.
-	std::string filename;
-	/// Function name.
-	std::string func;
-	/// Line number.
-	unsigned line;
-	/**
-	 * Constructor.
-     * @param filename File name.
-     * @param func Function name.
-     * @param line Line number.
-     */
-	RecordInfo(const std::string& _filename, const std::string& _func, unsigned _line): 
-		filename(_filename), func(_func), line(_line) {}
-};
-
-/**
- * Formats a log messages.
- */
-struct Formatter {
-	/// Width of the longest channel.
-	std::size_t channelwidth = 10;
-	
-	virtual ~Formatter() {}
-	/**
-	 * Extracts the maximum width of a channel to optimize the formatting.
-     * @param f Filter.
-     */
-	virtual void configure(const Filter& f) {
-		for (auto t: f.data) {
-			if (t.first.size() > channelwidth) channelwidth = t.first.size();
-		}
-	}
-	/**
-	 * Prints the prefix of a log message, i.e. everything that goes before the message given by the user, to the output stream.
-     * @param os Output stream.
-     * @param timer Timer holding program execution time.
-     * @param channel Channel name.
-     * @param level LogLevel.
-     * @param info Auxiliary information.
-     */
-	virtual void prefix(std::ostream& os, const utility::Timer& timer, const std::string& channel, LogLevel level, const RecordInfo& info) {
-		os.fill(' ');
-		os << "[" << std::right << std::setw(5) << timer << "] " << std::this_thread::get_id() << " " << level << " ";
-		std::string filename(utility::basename(info.filename));
-		unsigned long spacing = 1;
-		if (channelwidth + 15 > channel.size() + filename.size()) spacing = channelwidth + 15 - channel.size() - filename.size();
-		os << channel << std::string(spacing, ' ') << filename << ":" << std::left << std::setw(4) << info.line << " ";
-		if (!info.func.empty()) os << info.func << "(): ";
-	}
-	/**
-	 * Prints the suffix of a log message, i.e. everything that goes after the message given by the user, to the output stream.
-	 * Usually, this is only a newline.
-     * @param os Output stream.
-     */
-	virtual void suffix(std::ostream& os) {
-		os << std::endl;
-	}
-};
-
-/**
- * Main logger class.
- */
-class Logger {
-private:
-	/// Mapping from sink identifiers to associated logging classes.
-	std::map<std::string, std::tuple<std::shared_ptr<Sink>, Filter, std::shared_ptr<Formatter>>> data;
-	/// Logging mutex to ensure thread-safe logging.
-	std::mutex mutex;
-	/// Timer to track program runtime.
-	utility::Timer timer;
-
-	
-	/// There shall be no copy constructor.
-	Logger(const Logger&) = delete;
-	/// There shall be no assignment operator.
-	Logger& operator=(const Logger&) = delete;
-	/**
-	 * Default constructor.
-     */
-	Logger() {}
-public:
-	/**
-	 * Desctructor.
-     */
-	~Logger() {
-		data.clear();
-	}
-	/**
-	 * Returns the single instance of this class by reference.
-	 * If there is no instance yet, a new one is created.
-	 */
-	static inline Logger& getInstance() {
-		static Logger l;
-		return l;
-	}
-	/**
-	 * Check if a Sink with the given id has been installed.
-     * @param id Sink identifier.
-     * @return If a Sink with this id is present.
-     */
-	bool has(const std::string& id) const {
-		return data.find(id) != data.end();
-	}
-	/**
-	 * Installs the given sink.
-	 * If a Sink with this name is already present, it is overwritten.
-     * @param id Sink identifier.
-     * @param sink Sink.
-     */
-	void configure(const std::string& id, std::shared_ptr<Sink> sink) {
-		std::lock_guard<std::mutex> lock(mutex);
-		this->data[id] = std::make_tuple(sink, Filter(), std::make_shared<Formatter>());
-	}
-	/**
-	 * Installs a FileSink.
-     * @param id Sink identifier.
-     * @param filename Filename passed to the FileSink.
-     */
-	void configure(const std::string& id, const std::string& filename) {
-		configure(id, std::make_shared<FileSink>(filename));
-	}
-	/**
-	 * Installs a StreamSink.
-     * @param id Sink identifier.
-     * @param os Output stream passed to the StreamSink.
-     */
-	void configure(const std::string& id, std::ostream& os) {
-		configure(id, std::make_shared<StreamSink>(os));
-	}
-	/**
-	 * Retrieves the Filter for some Sink.
-     * @param id Sink identifier.
-     * @return Filter.
-     */
-	Filter& filter(const std::string& id) {
-		auto it = data.find(id);
-		assert(it != data.end());
-		return std::get<1>(it->second);
-	}
-	/**
-	 * Retrieves the Formatter for some Sink.
-     * @param id Sink identifier.
-     * @return Formatter.
-     */
-	std::shared_ptr<Formatter> formatter(const std::string& id) {
-		auto it = data.find(id);
-		assert(it != data.end());
-		return std::get<2>(it->second);
-	}
-	/**
-	 * Overwrites the Formatter for some Sink.
-     * @param id Sink identifier.
-     * @param fmt New Formatter.
-     */
-	void formatter(const std::string& id, std::shared_ptr<Formatter> fmt) {
-		auto it = data.find(id);
-		assert(it != data.end());
-		std::get<2>(it->second) = fmt;
-		std::get<2>(it->second)->configure(std::get<1>(it->second));
-	}
-	/**
-	 * Reconfigures all Formatter objects.
-	 * This should be done once after all configuration is finished.
-     */
-	void resetFormatter() {
-		for (auto& t: data) {
-			std::get<2>(t.second)->configure(std::get<1>(t.second));
-		}
-	}
-	/**
-	 * Logs a message.
-     * @param level LogLevel.
-     * @param channel Channel name.
-     * @param ss Message to be logged.
-     * @param info Auxiliary information.
-     */
-	void log(LogLevel level, const std::string& channel, const std::stringstream& ss, const RecordInfo& info) {
-		std::lock_guard<std::mutex> lock(mutex);
-		for (auto t: data) {
-			if (!std::get<1>(t.second).check(channel, level)) continue;
-			std::get<2>(t.second)->prefix(std::get<0>(t.second)->log(), timer, channel, level, info);
-			std::get<0>(t.second)->log() << ss.str();
-			std::get<2>(t.second)->suffix(std::get<0>(t.second)->log());
-		}
-	}
-};
-
-/**
- * Returns the single global instance of a Logger.
- * 
- * Calls `Logger::getInstance()`.
- * @return Logger object.
- */
-inline Logger& logger() {
-	return Logger::getInstance();
-}
+#ifdef _MSC_VER
+#define __func__ __FUNCTION__
+#endif
 
 /// Create a record info.
-#define __L3PP_LOG_RECORD ::l3pp::RecordInfo(__FILE__, __func__, __LINE__)
-/// Create a record info without function name.
-#define __L3PP_LOG_RECORD_NOFUNC ::l3pp::RecordInfo(__FILE__, "", __LINE__)
+#define __L3PP_LOG_RECORD l3pp::EntryContext(__FILE__, __LINE__, __func__)
 /// Basic logging macro.
-#define __L3PP_LOG(level, channel, expr) { std::stringstream __ss; __ss << expr; ::l3pp::Logger::getInstance().log(level, channel, __ss, __L3PP_LOG_RECORD); }
-/// Basic logging macro without function name.
-#define __L3PP_LOG_NOFUNC(level, channel, expr) { std::stringstream __ss; __ss << expr; ::l3pp::Logger::getInstance().log(level, channel, __ss, __L3PP_LOG_RECORD_NOFUNC); }
-
-/// Intended to be called when entering a function. Format: `<function name>(<args>)`.
-#define __L3PP_LOG_FUNC(channel, args) __L3PP_LOG_NOFUNC(::l3pp::LogLevel::LVL_TRACE, channel, __func__ << "(" << args << ")");
-
-/// Log with level LVL_TRACE.
-#define __L3PP_LOG_TRACE(channel, expr) __L3PP_LOG(::l3pp::LogLevel::LVL_TRACE, channel, expr)
-/// Log with level LVL_DEBUG.
-#define __L3PP_LOG_DEBUG(channel, expr) __L3PP_LOG(::l3pp::LogLevel::LVL_DEBUG, channel, expr)
-/// Log with level LVL_INFO.
-#define __L3PP_LOG_INFO(channel, expr) __L3PP_LOG(::l3pp::LogLevel::LVL_INFO, channel, expr)
-/// Log with level LVL_WARN.
-#define __L3PP_LOG_WARN(channel, expr) __L3PP_LOG(::l3pp::LogLevel::LVL_WARN, channel, expr)
-/// Log with level LVL_ERROR.
-#define __L3PP_LOG_ERROR(channel, expr) __L3PP_LOG(::l3pp::LogLevel::LVL_ERROR, channel, expr)
-/// Log with level LVL_FATAL.
-#define __L3PP_LOG_FATAL(channel, expr) __L3PP_LOG(::l3pp::LogLevel::LVL_FATAL, channel, expr)
-
-/// Log and assert the given condition, if the condition evaluates to false.
-#define __L3PP_LOG_ASSERT(channel, condition, expr) if (!(condition)) { __L3PP_LOG_FATAL(channel, expr); assert(condition); }
-
+#define __L3PP_LOG(level, channel, expr) { \
+        ::l3pp::LogPtr carl_channel = ::log4carl::Logger::getLogger(channel); \
+    if (carl_channel->getLevel() <= level) { \
+        ::l3pp::Logger::getLogger(channel)->log(level) << __L3PP_LOG_RECORD << expr; \
+    } \
 }
+
+/// Log with level TRACE.
+#define L3PP_LOG_TRACE(channel, expr) __L3PP_LOG(::l3pp::LogLevel::TRACE, channel, expr)
+/// Log with level DEBUG.
+#define L3PP_LOG_DEBUG(channel, expr) __L3PP_LOG(::l3pp::LogLevel::DEBUG, channel, expr)
+/// Log with level INFO.
+#define L3PP_LOG_INFO(channel, expr) __L3PP_LOG(::l3pp::LogLevel::INFO, channel, expr)
+/// Log with level WARN.
+#define L3PP_LOG_WARN(channel, expr) __L3PP_LOG(::l3pp::LogLevel::WARN, channel, expr)
+/// Log with level ERROR.
+#define L3PP_LOG_ERROR(channel, expr) __L3PP_LOG(::l3pp::LogLevel::ERROR, channel, expr)
+/// Log with level FATAL.
+#define L3PP_LOG_FATAL(channel, expr) __L3PP_LOG(::l3pp::LogLevel::FATAL, channel, expr)
