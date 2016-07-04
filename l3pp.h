@@ -144,12 +144,12 @@ struct EntryContext {
 /// Create a record info.
 #define __L3PP_LOG_RECORD l3pp::EntryContext(__FILE__, __LINE__, __func__)
 /// Basic logging macro.
-#define __L3PP_LOG(level, channel, expr) { \
+#define __L3PP_LOG(level, channel, expr) do { \
     auto L3PP_channel = ::log4carl::Logger::getLogger(channel); \
     if (L3PP_channel->getLevel() <= level) { \
         L3PP_channel->log(level, __L3PP_LOG_RECORD) << expr; \
     } \
-}
+} while(false)
 
 /// Log with level TRACE.
 #define L3PP_LOG_TRACE(channel, expr) __L3PP_LOG(::l3pp::LogLevel::TRACE, channel, expr)
