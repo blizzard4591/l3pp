@@ -29,9 +29,9 @@
  * Initial configuration may look like this:
  * @code{.cpp}
  * l3pp::Logger::initialize();
- * l3pp::SinkPtr sink = log4carl::StreamSink::create(std::clog);
+ * l3pp::SinkPtr sink = l3pp::StreamSink::create(std::clog);
  * l3pp::Logger::getRootLogger()->addSink(sink);
- * l3pp::Logger::getRootLogger()->setLevel(log4carl::LogLevel::INFO);
+ * l3pp::Logger::getRootLogger()->setLevel(l3pp::LogLevel::INFO);
  * @endcode
  * 
  * Macro facilitate the usage:
@@ -128,9 +128,9 @@ struct EntryContext {
 
 }
 
-#include "logger.h"
 #include "formatter.h"
 #include "sink.h"
+#include "logger.h"
 
 #include "impl/logging.h"
 #include "impl/logger.h"
@@ -145,7 +145,7 @@ struct EntryContext {
 #define __L3PP_LOG_RECORD l3pp::EntryContext(__FILE__, __LINE__, __func__)
 /// Basic logging macro.
 #define __L3PP_LOG(level, channel, expr) do { \
-    auto L3PP_channel = ::log4carl::Logger::getLogger(channel); \
+    auto L3PP_channel = ::l3pp::Logger::getLogger(channel); \
     if (L3PP_channel->getLevel() <= level) { \
         L3PP_channel->log(level, __L3PP_LOG_RECORD) << expr; \
     } \
