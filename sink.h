@@ -6,9 +6,6 @@
 
 #pragma once
 
-#include "logging.h"
-#include "formatter.h"
-
 #include <ostream>
 #include <fstream>
 

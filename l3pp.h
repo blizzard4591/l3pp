@@ -1,5 +1,5 @@
 /**
- * @file logging.h
+ * @file l3pp.h
  * @author Gereon Kremer <gereon.kremer@cs.rwth-aachen.de>
  * @author Harold Bruintjes <h.bruintjes@cs.rwth-aachen.de>
  *

@@ -1,13 +1,10 @@
 /**
- * @file logging.h
+ * @file logger.h
  *
  * Defines the base Logger class
  */
 
 #pragma once
-
-#include "logging.h"
-#include "sink.h"
 
 #include <vector>
 #include <algorithm>

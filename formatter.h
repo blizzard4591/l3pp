@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include "logging.h"
-
 #include <string>
 #include <tuple>
 
