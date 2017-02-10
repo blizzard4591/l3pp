@@ -176,4 +176,26 @@ public:
 };
 typedef std::shared_ptr<Logger> LogPtr;
 
+	/**
+ * Helper class to initialize l3pp. Call get() will
+ * retrieve the singleton, which will initialize the
+ * library.
+ */
+class Initializer {
+	Initializer() {
+		Logger::initialize();
+	}
+
+public:
+	~Initializer() {
+		Logger::deinitialize();
+	}
+
+	static Initializer const& get(){
+		static Initializer instance;
+		return instance;
+	}
+};
+
 }
+
