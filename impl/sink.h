@@ -10,7 +10,7 @@ namespace l3pp {
 
 inline void Sink::log(EntryContext const& context, std::string const& message) const {
 	if (context.level >= this->level) {
-		logEntry((*formatter)(context, message));
+		logEntry(context.level, (*formatter)(context, message));
 	}
 }
 

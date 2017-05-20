@@ -18,10 +18,11 @@ namespace l3pp {
  * entries.
  */
 class Sink {
+protected:
 	LogLevel level;
 	FormatterPtr formatter;
 
-	virtual void logEntry(std::string const& entry) const = 0;
+	virtual void logEntry(LogLevel level, std::string const& entry) const = 0;
 public:
 	Sink() : level(LogLevel::ALL), formatter(std::make_shared<Formatter>()) {
 
@@ -65,7 +66,8 @@ class StreamSink: public Sink {
 	/// Output stream.
 	mutable std::ostream os;
 
-	void logEntry(std::string const& entry) const override {
+protected:
+	void logEntry(LogLevel level, std::string const& entry) const override {
 		os << entry << std::flush;
 	}
 
@@ -87,7 +89,8 @@ class FileSink: public Sink {
 	/// File output stream.
 	mutable std::ofstream os;
 
-	void logEntry(std::string const& entry) const override {
+protected:
+	void logEntry(LogLevel level, std::string const& entry) const override {
 		os << entry << std::flush;
 	}
 
