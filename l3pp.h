@@ -135,7 +135,6 @@ struct EntryContext {
 #include "impl/logging.h"
 #include "impl/logger.h"
 #include "impl/formatter.h"
-#include "impl/sink.h"
 
 #ifdef _MSC_VER
 #define __func__ __FUNCTION__

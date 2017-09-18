@@ -13,35 +13,22 @@ namespace l3pp {
 
 /**
  * Base class for a logging sink. It can only log some log entry to which some
- * formatting is applied (see Formatter). A Sink may be given a log level,
- * which filters out all entries below that level. By default is logs all
- * entries.
+ * formatting is applied (see Formatter).
  */
 class Sink {
-protected:
-	LogLevel level;
 	FormatterPtr formatter;
 
-	virtual void logEntry(LogLevel level, std::string const& entry) const = 0;
 public:
-	Sink() : level(LogLevel::ALL), formatter(std::make_shared<Formatter>()) {
+	Sink() : formatter(std::make_shared<Formatter>()) {
 
 	}
-	Sink(FormatterPtr formatter) : level(LogLevel::ALL), formatter(formatter) {
+	Sink(FormatterPtr formatter) : formatter(formatter) {
 
 	}
 	/**
 	 * Default destructor.
      */
 	virtual ~Sink() {}
-
-	LogLevel getLevel() const {
-		return level;
-	}
-
-	void setLevel(LogLevel level) {
-		this->level = level;
-	}
 
 	FormatterPtr getFormatter() const {
 		return formatter;
@@ -51,29 +38,52 @@ public:
 		this->formatter = formatter;
 	}
 
+	std::string formatMessage(EntryContext const& context, std::string const& message) const {
+		return (*formatter)(context, message);
+	}
+
 	/**
 	 * Logs the given message with context info
 	 */
-	void log(EntryContext const& context, std::string const& message) const;
+	virtual void log(EntryContext const& context, std::string const& message) const = 0;
 };
 typedef std::shared_ptr<Sink> SinkPtr;
 
 /**
  * Logging sink that wraps an arbitrary `std::ostream`.
  * It is meant to be used for streams like `std::cout` or `std::cerr`.
+ * A StreamSink may be given a log level, which filters out all entries
+ * below that level. By default is logs all entries.
  */
 class StreamSink: public Sink {
+	/// Filtered loglevel
+	LogLevel level;
 	/// Output stream.
-	mutable std::ostream os;
+	mutable std::unique_ptr<std::ostream> os;
 
-protected:
-	void logEntry(LogLevel level, std::string const& entry) const override {
-		os << entry << std::flush;
+	LogLevel getLevel() const {
+		return level;
+	}
+
+	void setLevel(LogLevel level) {
+		this->level = level;
 	}
 
 	explicit StreamSink(std::ostream& _os) :
-		os(_os.rdbuf()) {}
+			level(LogLevel::ALL),
+			os(new std::ostream(_os.rdbuf())) {}
+
+	explicit StreamSink(std::string const& filename) :
+			level(LogLevel::ALL),
+			os(new std::ofstream(filename, std::ios::out)) {}
+
 public:
+	void log(EntryContext const& context, std::string const& message) const override {
+		if (context.level >= this->level) {
+			*os << formatMessage(context, message) << std::flush;
+		}
+	}
+
 	/**
 	 * Create a StreamSink from some output stream.
      * @param os Output stream.
@@ -81,29 +91,13 @@ public:
 	static SinkPtr create(std::ostream& os) {
 		return SinkPtr(new StreamSink(os));
 	}
-};
-/**
- * Logging sink for file output.
- */
-class FileSink: public Sink {
-	/// File output stream.
-	mutable std::ofstream os;
 
-protected:
-	void logEntry(LogLevel level, std::string const& entry) const override {
-		os << entry << std::flush;
-	}
-
-	explicit FileSink(const std::string& filename) :
-		os(filename, std::ios::out) {}
-public:
 	/**
-	 * Create a FileSink that logs to the specified file.
-	 * The file is truncated upon construction.
-     * @param filename
+	 * Create a StreamSink from some output file.
+     * @param filename Filename for output file.
      */
-	static SinkPtr create(const std::string& filename) {
-		return SinkPtr(new FileSink(filename));
+	static SinkPtr create(std::string const& filename) {
+		return SinkPtr(new StreamSink(filename));
 	}
 };
 
