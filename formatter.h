@@ -30,6 +30,9 @@ public:
 	}
 };
 
+typedef basic_formatter<char> formatter;
+typedef basic_formatter<wchar_t> wformatter;
+
 /**
  * Possible fields for FieldStr instance
  */
@@ -76,6 +79,11 @@ public:
 	void stream(std::basic_ostream<char_t>& os, basic_log_entry<char_t> const& context) const;
 };
 
+template<Field f, int Width = 0, Justification j = Justification::RIGHT, char Fill = ' '>
+using field = basic_field<char, f, Width, j, Fill>;
+template<Field f, int Width = 0, Justification j = Justification::RIGHT, wchar_t Fill = ' '>
+using wfield = basic_field<wchar_t, f, Width, j, Fill>;
+
 /**
  * Formatter for log time stamps. The constructor expects a single string
  * argument which is a formatter for the time stamp. For the specification of
@@ -94,6 +102,9 @@ public:
 
 	void stream(std::basic_ostream<char_t>& os, basic_log_entry<char_t> const& context) const;
 };
+
+typedef basic_time_field<char> time_field;
+typedef basic_time_field<wchar_t> wtime_field;
 
 /**
  * Formatter which formats the output based on the (templated) arguments given.
@@ -138,6 +149,9 @@ public:
 
 	std::basic_string<char_t> format(basic_log_entry<char_t> const& context) const override;
 };
+
+typedef basic_template_formatter<char> template_formatter;
+typedef basic_template_formatter<wchar_t> wtemplate_formatter;
 
 /**
  * Helper function to create a TemplateFormatter. Simply call with some

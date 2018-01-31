@@ -109,6 +109,7 @@ public:
 };
 
 typedef basic_stream_sink<char> stream_sink;
+typedef basic_stream_sink<wchar_t> wstream_sink;
 
 }
 

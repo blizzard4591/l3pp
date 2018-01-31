@@ -163,9 +163,6 @@ public:
 		return log(LogLevel::FATAL, context);
 	}
 
-	static void initialize();
-	static void deinitialize();
-
 	static auto getRootLogger() {
 		static auto root_logger = logger_ptr(new basic_logger<char_t>());
 		return root_logger;
@@ -173,6 +170,12 @@ public:
 
 	static logger_ptr getLogger(std::basic_string<char_t> name);
 };
+
+typedef basic_logger<char> logger;
+typedef basic_logger<wchar_t> wlogger;
+
+typedef ptr<logger> logger_ptr;
+typedef ptr<wlogger> wlogger_ptr;
 
 }
 
