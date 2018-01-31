@@ -75,7 +75,7 @@ class basic_logger {
 	bool additive;
 
 	// Logger constructors are private
-	basic_logger() : parent(nullptr), name(""), level(LogLevel::DEFAULT),
+	basic_logger() : parent(nullptr), name(), level(LogLevel::DEFAULT),
 		additive(true)
 	{
 
