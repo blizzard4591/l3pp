@@ -17,20 +17,18 @@ namespace l3pp {
  * with the log level prefix, see derived classes such as TemplatedFormatter
  * for more interesting data.
  */
-class Formatter {
-	friend class Logger;
+template<typename char_t>
+class basic_formatter {
+	friend class basic_logger<char_t>;
 
-	static void initialize();
-
-	virtual std::string format(EntryContext const& context, std::string const& msg) const;
+	virtual std::basic_string<char_t> format(basic_log_entry<char_t> const& context) const;
 public:
-	virtual ~Formatter() {}
+	virtual ~basic_formatter() {}
 
-	std::string operator()(EntryContext const& context, std::string const& msg) {
-		return format(context, msg);
+	std::basic_string<char_t> operator()(basic_log_entry<char_t> const& context) {
+		return format(context);
 	}
 };
-typedef std::shared_ptr<Formatter> FormatterPtr;
 
 /**
  * Possible fields for FieldStr instance
@@ -72,10 +70,10 @@ enum class Justification {
  * is printed, see logging::Field.
  * The other template arguments control the alignment of the output string.
  */
-template<Field field, int Width = 0, Justification j = Justification::RIGHT, char Fill = ' '>
-class FieldStr {
+template<typename char_t, Field field, int Width = 0, Justification j = Justification::RIGHT, char_t Fill = ' '>
+class basic_field {
 public:
-	void stream(std::ostream& os, EntryContext const& context, std::string const& msg) const;
+	void stream(std::basic_ostream<char_t>& os, basic_log_entry<char_t> const& context) const;
 };
 
 /**
@@ -83,18 +81,18 @@ public:
  * argument which is a formatter for the time stamp. For the specification of
  * this format string see the documentation for std::put_time . You can use for
  * example "%c" or "%T".
- * The template arguments control the alignment of the output string.
  */
-class TimeStr {
-	std::string formatStr;
+template<typename char_t>
+class basic_time_field {
+	std::basic_string<char_t> formatStr;
 
 public:
-	TimeStr(char const* format) : formatStr(format) {
+	basic_time_field(char const* format) : formatStr(format) {
 	}
-	TimeStr(std::string const& format) : formatStr(format) {
+	basic_time_field(std::basic_string<char_t> const& format) : formatStr(format) {
 	}
 
-	void stream(std::ostream& os, EntryContext const& context, std::string const&) const;
+	void stream(std::basic_ostream<char_t>& os, basic_log_entry<char_t> const& context) const;
 };
 
 /**
@@ -103,42 +101,42 @@ public:
  * more interestingly also the various FormatField subclasses. These classes
  * can output the various fields associated with a log entry.
  */
-template<typename ... Formatters>
-class TemplateFormatter : public Formatter {
+template<typename char_t, typename ... Formatters>
+class basic_template_formatter : public basic_formatter<char_t> {
 	std::tuple<Formatters...> formatters;
 
 	template <int N>
 	typename std::enable_if<N < (sizeof...(Formatters))>::type
-	formatTuple(EntryContext const& context, std::string const& msg, std::ostream& os) const {
-		formatElement(std::get<N>(formatters), os, context, msg);
-		formatTuple<N+1>(context, msg, os);
+	formatTuple(basic_log_entry<char_t> const& context, std::basic_ostream<char_t>& os) const {
+		formatElement(std::get<N>(formatters), os, context);
+		formatTuple<N+1>(context, os);
 	}
 
 	template <int N>
 	typename std::enable_if<(N >= sizeof...(Formatters))>::type
-	formatTuple(EntryContext const&, std::string const&, std::ostream&) const {
+	formatTuple(basic_log_entry<char_t> const&, std::basic_ostream<char_t>&) const {
 	}
 
-	template<Field field, int Width, Justification j, char Fill>
-	void formatElement(FieldStr<field, Width, j, Fill> const& t, std::ostream& stream, EntryContext const& context, std::string const& msg) const {
-		t.stream(stream, context, msg);
+	template<Field field, int Width, Justification j, char_t Fill>
+	void formatElement(basic_field<char_t, field, Width, j, Fill> const& t, std::basic_ostream<char_t>& stream, basic_log_entry<char_t> const& context) const {
+		t.stream(stream, context);
 	}
 
-	void formatElement(TimeStr const& t, std::ostream& stream, EntryContext const& context, std::string const& msg) const {
-		t.stream(stream, context, msg);
+	void formatElement(basic_time_field<char_t> const& t, std::basic_ostream<char_t>& stream, basic_log_entry<char_t> const& context) const {
+		t.stream(stream, context);
 	}
 
 	template<typename T>
-	void formatElement(T const& t, std::ostream& stream, EntryContext const&, std::string const&) const {
+	void formatElement(T const& t, std::basic_ostream<char_t>& stream, basic_log_entry<char_t> const&) const {
 		stream << t;
 	}
 public:
-	TemplateFormatter(Formatters ... formatters) :
+	basic_template_formatter(Formatters ... formatters) :
 		formatters(std::forward<Formatters>(formatters)...)
 	{
 	}
 
-	std::string format(EntryContext const& context, std::string const& msg) const override;
+	std::basic_string<char_t> format(basic_log_entry<char_t> const& context) const override;
 };
 
 /**
@@ -151,8 +149,8 @@ public:
  * @endcode
  */
 template<typename ... Formatters>
-FormatterPtr makeTemplateFormatter(Formatters&& ... formatters) {
-	return std::make_shared<TemplateFormatter<Formatters...>>(std::forward<Formatters>(formatters)...);
+auto makeTemplateFormatter(Formatters&& ... formatters) {
+	return std::make_shared<basic_template_formatter<char, Formatters...>>(std::forward<Formatters>(formatters)...);
 }
 
 }

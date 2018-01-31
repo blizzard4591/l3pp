@@ -25,19 +25,15 @@ namespace detail {
 	}
 }
 
-inline void Formatter::initialize() {
-	// Init wall-time
-	detail::GetStartTime();
-}
-
-inline std::string Formatter::format(EntryContext const& context, std::string const& msg) const {
-	std::stringstream stream;
-	stream << context.level << " - " << msg << '\n';
+template<typename char_t>
+inline std::basic_string<char_t> basic_formatter<char_t>::format(basic_log_entry<char_t> const& context) const {
+	std::basic_stringstream<char_t> stream;
+	stream << context.level << " - " << context.msg << '\n';
 	return stream.str();
 }
 
-template<Field field, int Width, Justification j, char Fill>
-inline void FieldStr<field, Width, j, Fill>::stream(std::ostream& os, EntryContext const& context, std::string const& msg) const {
+template<typename char_t, Field field, int Width, Justification j, char_t Fill>
+inline void basic_field<char_t, field, Width, j, Fill>::stream(std::basic_ostream<char_t>& os, basic_log_entry<char_t> const& context) const {
 	os << std::setw(Width);
 	os << std::setfill(Fill);
 	switch(j) {
@@ -68,7 +64,7 @@ inline void FieldStr<field, Width, j, Fill>::stream(std::ostream& os, EntryConte
 			os << context.logger->getName();
 			break;
 		case Field::Message:
-			os << msg;
+			os << context.msg;
 			break;
 		case Field::LogLevel:
 			os << context.level;
@@ -80,25 +76,18 @@ inline void FieldStr<field, Width, j, Fill>::stream(std::ostream& os, EntryConte
 	}
 }
 
-inline void TimeStr::stream(std::ostream& os, EntryContext const& context, std::string const&) const {
+template<typename char_t>
+inline void basic_time_field<char_t>::stream(std::basic_ostream<char_t>& os, basic_log_entry<char_t> const& context) const {
 	auto time = std::chrono::system_clock::to_time_t(context.timestamp);
 	auto timeinfo = localtime (&time);
-#if __GNUC__ >= 5 || __clang_major__ > 3 || (__clang_major__ == 3 && __clang_minor__ >= 7) || _MSC_VER >= 1700
-//TODO: Need better way to detect thing
 	os << std::put_time(timeinfo, formatStr.c_str());
-#else
-	char buffer[1024];
-	if (strftime(buffer, 1024, formatStr.c_str(), timeinfo)) {
-		os << buffer;
-	}
-#endif
 }
 
-template<typename ... Formatters>
-inline std::string TemplateFormatter<Formatters...>::format(EntryContext const& context, std::string const& msg) const {
-	std::stringstream stream;
+template<typename char_t, typename ... Formatters>
+inline std::basic_string<char_t> basic_template_formatter<char_t, Formatters...>::format(basic_log_entry<char_t> const& context) const {
+	std::basic_stringstream<char_t> stream;
 
-	formatTuple<0>(context, msg, stream);
+	formatTuple<0>(context, stream);
 
 	return stream.str();
 }

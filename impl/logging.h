@@ -16,7 +16,8 @@ namespace l3pp {
  * @param level LogLevel.
  * @return os.
  */
-inline std::ostream& operator<<(std::ostream& os, LogLevel level) {
+template<typename char_t>
+inline std::basic_ostream<char_t>& operator<<(std::basic_ostream<char_t>& os, LogLevel level) {
 	switch (level) {
 		case LogLevel::TRACE:   return os << "TRACE";
 		case LogLevel::DEBUG:   return os << "DEBUG";

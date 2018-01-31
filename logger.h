@@ -17,33 +17,31 @@ namespace l3pp {
  * returned by Logger log() functions, so they can be used as such:
  * logger->debug() << "Message";
  */
-class LogStream {
-	friend class Logger;
+template<typename char_t>
+class basic_log_stream {
+	friend class basic_logger<char_t>;
 
-	Logger& logger;
-	LogLevel level;
-	EntryContext context;
-	mutable std::ostringstream stream;
+	basic_log_entry<char_t> entry;
+	mutable std::basic_ostringstream<char_t> stream;
 
-	LogStream(Logger& logger, LogLevel level, EntryContext context) :
-		logger(logger), level(level), context(context)
+	basic_log_stream(basic_log_entry<char_t> entry) :
+		entry(std::move(entry))
 	{
 	}
 
-	LogStream(const LogStream&) = delete;
-	LogStream& operator=(const LogStream&) = delete;
 public:
-	LogStream(LogStream&& other) :
-		logger(other.logger), level(other.level), context(std::move(other.context))/*,
-		stream(std::move(other.stream))*/
-	{
-		stream.str(other.stream.str());
-	}
-	~LogStream();
+	basic_log_stream(basic_log_stream const&) = default;
+	basic_log_stream(basic_log_stream&&) = default;
 
-	template<typename T>
-	friend LogStream const& operator<<(LogStream const& stream, T const& val);
-	friend LogStream const& operator<<(LogStream const& stream, std::ostream& (*F)(std::ostream&));
+	basic_log_stream& operator=(const basic_log_stream&) = default;
+	basic_log_stream& operator=(basic_log_stream&&) = default;
+
+	~basic_log_stream();
+
+	template<typename char_tt, typename T>
+	friend basic_log_stream<char_tt> const& operator<<(basic_log_stream<char_tt> const& stream, T const& val);
+	template<typename char_tt>
+	friend basic_log_stream<char_tt> const& operator<<(basic_log_stream<char_tt> const& stream, std::basic_ostream<char_t>& (*F)(std::basic_ostream<char_t>&));
 };
 
 /**
@@ -63,37 +61,39 @@ public:
  * is logged. For convenience, various logging macros are defined at the end
  * of this header.
  */
-class Logger {
-	friend class Formatter;
+template<typename char_t>
+class basic_logger {
+	friend class basic_log_stream<char_t>;
 
-	typedef std::shared_ptr<Logger> LogPtr;
+	typedef ptr<basic_logger<char_t>> logger_ptr;
+	typedef ptr<basic_sink<char_t>> sink_ptr;
 
-	LogPtr parent;
-	std::string name;
+	logger_ptr parent;
+	std::basic_string<char_t> name;
 	LogLevel level;
-	std::vector<SinkPtr> sinks;
+	std::vector<sink_ptr> sinks;
 	bool additive;
 
 	// Logger constructors are private
-	Logger() : parent(nullptr), name(""), level(LogLevel::DEFAULT),
+	basic_logger() : parent(nullptr), name(""), level(LogLevel::DEFAULT),
 		additive(true)
 	{
 
 	}
 
-	Logger(std::string const& name, LogPtr parent) : parent(parent), name(name),
+	basic_logger(std::basic_string<char_t> const& name, logger_ptr parent) : parent(parent), name(name),
 		level(LogLevel::INHERIT), additive(true)
 	{
 	}
 
-	void logEntry(EntryContext const& context, std::string const& msg);
+	void logEntry(basic_log_entry<char_t> const& entry) const;
 
 public:
-	void addSink(SinkPtr sink) {
+	void addSink(sink_ptr sink) {
 		sinks.push_back(sink);
 	}
 
-	void removeSink(SinkPtr sink);
+	void removeSink(sink_ptr sink);
 
 	void setLevel(LogLevel level) {
 		if (level == LogLevel::INHERIT && !parent) {
@@ -109,7 +109,7 @@ public:
 		return level;
 	}
 
-	std::string const& getName() const {
+	auto const& getName() const {
 		return name;
 	}
 
@@ -121,80 +121,57 @@ public:
 		this->additive = additive;
 	}
 
-	void log(LogLevel level, std::string const& msg, EntryContext context = EntryContext());
+	void log(LogLevel level, std::basic_string<char_t> const& msg, log_context context = log_context());
 
-	void trace(std::string const& msg, EntryContext context = EntryContext()) {
+	void trace(std::basic_string<char_t> const& msg, log_context context = log_context()) {
 		log(LogLevel::TRACE, msg, context);
 	}
-	void debug(std::string const& msg, EntryContext context = EntryContext()) {
+	void debug(std::basic_string<char_t> const& msg, log_context context = log_context()) {
 		log(LogLevel::DEBUG, msg, context);
 	}
-	void info(std::string const& msg, EntryContext context = EntryContext()) {
+	void info(std::basic_string<char_t> const& msg, log_context context = log_context()) {
 		log(LogLevel::INFO, msg, context);
 	}
-	void warn(std::string const& msg, EntryContext context = EntryContext()) {
+	void warn(std::basic_string<char_t> const& msg, log_context context = log_context()) {
 		log(LogLevel::WARN, msg, context);
 	}
-	void error(std::string const& msg, EntryContext context = EntryContext()) {
+	void error(std::basic_string<char_t> const& msg, log_context context = log_context()) {
 		log(LogLevel::ERR, msg, context);
 	}
-	void fatal(std::string const& msg, EntryContext context = EntryContext()) {
+	void fatal(std::basic_string<char_t> const& msg, log_context context = log_context()) {
 		log(LogLevel::FATAL, msg, context);
 	}
 
-	LogStream log(LogLevel level, EntryContext context = EntryContext());
+	basic_log_stream<char_t> log(LogLevel level, log_context context = log_context());
 
-	LogStream trace(EntryContext context = EntryContext()) {
+	auto trace(log_context context = log_context()) {
 		return log(LogLevel::TRACE, context);
 	}
-	LogStream debug(EntryContext context = EntryContext()) {
+	auto debug(log_context context = log_context()) {
 		return log(LogLevel::DEBUG, context);
 	}
-	LogStream info(EntryContext context = EntryContext()) {
+	auto info(log_context context = log_context()) {
 		return log(LogLevel::INFO, context);
 	}
-	LogStream warn(EntryContext context = EntryContext()) {
+	auto warn(log_context context = log_context()) {
 		return log(LogLevel::WARN, context);
 	}
-	LogStream error(EntryContext context = EntryContext()) {
+	auto error(log_context context = log_context()) {
 		return log(LogLevel::ERR, context);
 	}
-	LogStream fatal(EntryContext context = EntryContext()) {
+	auto fatal(log_context context = log_context()) {
 		return log(LogLevel::FATAL, context);
 	}
 
 	static void initialize();
 	static void deinitialize();
 
-	static LogPtr getRootLogger();
-
-	static LogPtr getLogger(LogPtr logger) {
-		return logger;
+	static auto getRootLogger() {
+		static auto root_logger = logger_ptr(new basic_logger<char_t>());
+		return root_logger;
 	}
 
-	static LogPtr getLogger(std::string name);
-};
-typedef std::shared_ptr<Logger> LogPtr;
-
-	/**
- * Helper class to initialize l3pp. Call get() will
- * retrieve the singleton, which will initialize the
- * library.
- */
-class Initializer {
-	Initializer() {
-		Logger::initialize();
-	}
-
-public:
-	~Initializer() {
-		Logger::deinitialize();
-	}
-
-	static Initializer const& get(){
-		static Initializer instance;
-		return instance;
-	}
+	static logger_ptr getLogger(std::basic_string<char_t> name);
 };
 
 }
